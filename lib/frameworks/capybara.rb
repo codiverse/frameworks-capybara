@@ -8,6 +8,7 @@ require 'monkey-patches/net-http-persistent-patches'
 require 'selenium-webdriver'
 require 'capybara/mechanize/cucumber' 
 require 'capybara/celerity'
+require 'capybara/poltergeist'
 
 class CapybaraSetup
 
@@ -32,6 +33,8 @@ class CapybaraSetup
       :version => ENV['REMOTE_BROWSER_VERSION'],
       :url => ENV['REMOTE_URL']}
 
+    poltergeist_opts = {}
+
     custom_opts = {:job_name => ENV['SAUCE_JOB_NAME'],
       :max_duration => ENV['SAUCE_MAX_DURATION']}
 
@@ -53,6 +56,12 @@ class CapybaraSetup
       @driver = register_celerity_driver(capybara_opts)
     when :mechanize then
       @driver = register_mechanize_driver(capybara_opts)
+    when :phantomjs then
+      if(ENV['ENVIRONMENT'] == 'sandbox')
+        # PhantomJS reads the system proxy settings, not the env variable settings (on a mac, at least)
+        poltergeist_opts[:phantomjs_options] = ['--proxy-type=none']      
+      end
+      @driver = register_poltergeist_driver(capybara_opts.merge(poltergeist_opts))
     else
       @driver = register_selenium_driver(capybara_opts, selenium_remote_opts, custom_opts)
     end
@@ -162,6 +171,13 @@ class CapybaraSetup
     :mechanize
   end
 
+  def register_poltergeist_driver(opts)
+    Capybara.register_driver :poltergeist do |app|
+      Capybara::Poltergeist::Driver.new(app,opts); 
+    end
+    Capybara.javascript_driver = :poltergeist
+    :poltergeist
+  end
 
   def clean_opts(opts, *args)
     args.each do |arg|
